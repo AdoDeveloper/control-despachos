@@ -1,0 +1,26 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider        = "prisma-client-js"        // ESM, nuevo cliente
+  output          = "../src/generated/prisma" // Ruta relativa al schema.prisma
+  previewFeatures = ["driverAdapters"]        // Opcional
+  moduleFormat    = "esm"                     // Formato ESM
+}
+
+datasource db {
+  provider = "postgresql"                     // Cambiado a Postgres
+  url      = env("DATABASE_URL")
+}
+
+model Notification {
+  id          BigInt   @id
+  message     String
+  read        Boolean
+  inserted_at DateTime
+
+  @@map("notifications")
+}
