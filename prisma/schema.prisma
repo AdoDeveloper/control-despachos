@@ -1,19 +1,54 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider        = "prisma-client-js"        // ESM, nuevo cliente
-  output          = "../src/generated/prisma" // Ruta relativa al schema.prisma
-  previewFeatures = ["driverAdapters"]        // Opcional
-  moduleFormat    = "esm"                     // Formato ESM
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
-  provider = "postgresql"                     // Cambiado a Postgres
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  id                Int       @id @default(autoincrement()) @map("id")
+  username          String    @unique @map("username")
+  nombreCompleto    String    @map("nombre_completo")
+  codigo            String    @map("codigo")
+  email             String?   @map("email")
+  password          String?   @map("password")
+  eliminado         Boolean   @default(false) @map("eliminado")
+  activo            Boolean   @default(true)  @map("activo")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  roleId            Int       @map("role_id")
+  role              Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  // Relaciones con Despacho
+  tareasOperador    Despacho[]   @relation("operadorTasks")
+  tareasSupervisión Despacho[]   @relation("supervisorTasks")
+  tareasEnlonador   Despacho[]   @relation("enlonadorTasks")
+
+  sessions          Session[]
+
+  @@map("users")
+}
+
+model Role {
+  id     Int     @id @default(autoincrement()) @map("id")
+  name   String  @unique @map("name")
+  users  User[]
+
+  @@map("roles")
+}
+
+model Session {
+  id           String   @id @default(uuid()) @map("id")
+  sessionToken String   @unique @map("session_token")
+  userId       Int      @map("user_id")
+  expires      DateTime @map("expires")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "sessions_user_id_idx")
+  @@map("sessions")
 }
 
 model Notification {
@@ -23,4 +58,46 @@ model Notification {
   inserted_at DateTime
 
   @@map("notifications")
+}
+
+/// ---------------------------------------------------------------------
+/// Modelo para el flujo de despacho
+/// ---------------------------------------------------------------------
+model Despacho {
+  id                    Int          @id @default(autoincrement()) @map("id")
+  puntoDespacho         String       @map("punto_despacho")
+  placaCabezal          String       @map("placa_cabezal")
+
+  // Quién registró inicialmente (Operador de Báscula)
+  operadorBasculaId     Int          @map("operador_bascula_id")
+  operadorBascula       User         @relation("operadorTasks",       fields: [operadorBasculaId],     references: [id])
+
+  // Quién asignó (Supervisor de Despacho)
+  supervisorDespachoId  Int?         @map("supervisor_despacho_id")
+  supervisorDespacho    User?        @relation("supervisorTasks",    fields: [supervisorDespachoId],  references: [id])
+
+  // Quién la ejecuta (Enlonador)
+  enlonadorId           Int?         @map("enlonador_id")
+  enlonador             User?        @relation("enlonadorTasks",     fields: [enlonadorId],          references: [id])
+
+  // Estado de la tarea
+  estado                EstadoTarea  @default(PENDIENTE) @map("estado")
+
+  // Marcas de tiempo en formato string
+  fechaRegistro         String       @map("fecha_registro")
+  fechaAceptacion       String?      @map("fecha_aceptacion")
+  fechaEnProceso        String?      @map("fecha_en_proceso")
+  fechaCompletado       String?      @map("fecha_completado")
+
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @updatedAt      @map("updated_at")
+
+  @@map("despachos")
+}
+
+enum EstadoTarea {
+  PENDIENTE   // recién creada, aún no aceptada
+  ACEPTADO    // el Enlonador vio la tarea y la aceptó
+  EN_PROCESO  // el Enlonador la está ejecutando
+  COMPLETADO    // ya finalizada
 }

@@ -2,7 +2,7 @@
 
 import { NextResponse } from 'next/server'
 import { createClient }   from '@supabase/supabase-js'
-import prisma             from '../../../lib/prisma'
+import prisma             from '../../../../lib/prisma'
 
 //  — Inicializa Supabase con la Service Role Key (omitiendo RLS)
 const supabase = createClient(
