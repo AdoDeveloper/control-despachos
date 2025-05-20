@@ -52,15 +52,6 @@ model Session {
   @@map("sessions")
 }
 
-model Notification {
-  id          BigInt   @id
-  message     String
-  read        Boolean
-  inserted_at DateTime
-
-  @@map("notifications")
-}
-
 /// ---------------------------------------------------------------------
 /// Modelo para el flujo de despacho
 /// ---------------------------------------------------------------------
