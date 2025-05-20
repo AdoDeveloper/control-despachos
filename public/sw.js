@@ -4,13 +4,24 @@
 self.addEventListener('install', e => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 
-// 2️⃣ Solo manejamos los mensajes tipo SHOW_NOTIFICATION
+// 2️⃣ Manejamos los mensajes tipo SHOW_NOTIFICATION
+//    Ahora incorporamos la URL de destino en options.data.url
 self.addEventListener('message', event => {
   if (event.data?.type === 'SHOW_NOTIFICATION') {
     const { title, options } = event.data;
-    // Aseguramos que mostramos la notificación desde aquí
+    const { url, ...restData } = options.data || {};
+
+    // Mostramos la notificación, inyectando la URL en data.url
     event.waitUntil(
-      self.registration.showNotification(title, options)
+      self.registration.showNotification(title, {
+        ...options,
+        data: {
+          // guardamos la URL para luego abrirla al hacer click
+          url: url || null,
+          // cualquier otro campo de data que viniera
+          ...restData,
+        }
+      })
     );
   }
 });
@@ -18,15 +29,19 @@ self.addEventListener('message', event => {
 // 3️⃣ Manejo del clic sobre la notificación
 self.addEventListener('notificationclick', event => {
   event.notification.close();
+  // Sacamos la URL que guardamos en data.url
+  const targetUrl = event.notification.data?.url || '/';
+
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
       for (const client of clientList) {
-        if (client.url === event.notification.data && 'focus' in client) {
+        // Si ya hay una ventana abierta en esa URL, la enfocamos
+        if (client.url === targetUrl && 'focus' in client) {
           return client.focus();
         }
       }
-      // Si no hay ninguna ventana abierta en esa URL, abrimos una nueva
-      return clients.openWindow(event.notification.data);
+      // Si no, abrimos una nueva
+      return clients.openWindow(targetUrl);
     })
   );
 });

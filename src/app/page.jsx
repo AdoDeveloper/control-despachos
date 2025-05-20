@@ -309,8 +309,9 @@ function DashboardCore({ user }) {
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'despachos' },
-        ({ old, new: row }) => {
+        async ({ old, new: row }) => {
           fetchDespachos();
+          // Cambio de estado
           if (!suppressRealtime.current && old.estado !== row.estado) {
             const estadoTexto = formatEstado(row.estado);
             navigator.serviceWorker.ready
@@ -333,23 +334,34 @@ function DashboardCore({ user }) {
               showConfirmButton: false,
             });
           }
+          // Cambio de enlonador
           if (!suppressRealtime.current && old.enlonador_id !== row.enlonador_id) {
+            // Obtener nombre del enlonador asignado
+            const {
+              data: enlonData,
+              error: enlonError,
+            } = await supabase
+              .from('user_sessions_supabase')
+              .select('username')
+              .eq('id', row.enlonador_id)
+              .single();
+            const enlonName = enlonError ? 'desconocido' : enlonData.username;
             navigator.serviceWorker.ready
               .then((reg) =>
                 reg.showNotification('Asignación modificada', {
-                  body: row.punto_despacho,
+                  body: `${row.punto_despacho} → ${enlonName}`,
                   icon: '/favicon.ico',
                 })
               )
               .catch(() =>
                 new Notification('Asignación modificada', {
-                  body: row.punto_despacho,
+                  body: `${row.punto_despacho} → ${enlonName}`,
                 })
               );
             Swal.fire({
               icon: 'info',
               title: 'Asignación modificada',
-              text: row.punto_despacho,
+              text: `${row.punto_despacho} → ${enlonName}`,
               timer: 2000,
               showConfirmButton: false,
             });
@@ -427,31 +439,38 @@ function DashboardCore({ user }) {
     suppressRealtime.current = true;
     const { data, error } = await supabase
       .from('despachos')
-      .update({ supervisor_despacho_id: sessionId, enlonador_id: selEnlon })
+      .update({
+        supervisor_despacho_id: sessionId,
+        enlonador_id: selEnlon,
+      })
       .eq('id', assignId)
-      .select('punto_despacho')
+      .select(
+        'punto_despacho, enlonador:user_sessions_supabase!despachos_enlonador_id_fkey(username)'
+      )
       .single();
     if (error) {
       Swal.fire('Error', error.message, 'error');
     } else {
+      const assignedName = data.enlonador?.username || '';
       if (Notification.permission === 'granted') {
         navigator.serviceWorker.ready
           .then((reg) =>
             reg.showNotification('Despacho asignado', {
-              body: data.punto_despacho,
+              body: `${data.punto_despacho} → ${assignedName}`,
               icon: '/favicon.ico',
             })
           )
           .catch(() =>
             new Notification('Despacho asignado', {
-              body: data.punto_despacho,
+              body: `${data.punto_despacho} → ${assignedName}`,
+              icon: '/favicon.ico',
             })
           );
       }
       Swal.fire({
         icon: 'success',
         title: 'Despacho asignado',
-        text: data.punto_despacho,
+        text: `${data.punto_despacho} → ${assignedName}`,
         timer: 2000,
         showConfirmButton: false,
       });
@@ -483,6 +502,7 @@ function DashboardCore({ user }) {
           .catch(() =>
             new Notification('Estado actualizado', {
               body: `${data.punto_despacho} → ${estadoTexto}`,
+              icon: '/favicon.ico',
             })
           );
       }
@@ -732,7 +752,6 @@ function DashboardCore({ user }) {
                   value={placa}
                   maxLength={10}
                   onChange={(e) => {
-                    // Solo alfanuméricos, en mayúsculas, sin límites de cursor
                     const raw = e.target.value;
                     const clean = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
                     setPlaca(clean);
