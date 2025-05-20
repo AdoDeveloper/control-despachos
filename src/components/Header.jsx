@@ -129,10 +129,14 @@ export default function Header({ title }) {
               </div>
               <div className="text-xs text-gray-500">
                 {roleId === 1
-                  ? "Administrador"
-                  : roleId === 2
-                  ? "Supervisor"
-                  : "Usuario"}
+                    ? "Administrador"
+                    : roleId === 2
+                    ? "Supervisor"
+                    : roleId === 3
+                    ? "Operador"
+                    : roleId === 4
+                    ? "Enlonador"
+                    : "Usuario"}
               </div>
             </div>
             <FiChevronDown size={16} className="text-gray-500" />
