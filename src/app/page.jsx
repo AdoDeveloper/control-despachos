@@ -159,7 +159,7 @@ function DashboardCore({ user }) {
     COMPLETADO: 'bg-green-100 text-green-800',
   };
   const formatEstado = (e) => {
-    const lower = e.toLowerCase().replace(/_/g, ' ');
+    const lower = e.toLowerCase().replace(/\_/g, ' ');
     return lower.charAt(0).toUpperCase() + lower.slice(1);
   };
 
@@ -250,10 +250,9 @@ function DashboardCore({ user }) {
       const start = new Date(`${dateFilter}T00:00:00`);
       const next = new Date(start);
       next.setDate(start.getDate() + 1);
-      q = q.gte('fecha_registro', start.toISOString()).lt(
-        'fecha_registro',
-        next.toISOString()
-      );
+      q = q
+        .gte('fecha_registro', start.toISOString())
+        .lt('fecha_registro', next.toISOString());
     }
     if (roleId === 3 && filterMine) {
       q = q.eq('operador_bascula_id', sessionId);
@@ -265,7 +264,8 @@ function DashboardCore({ user }) {
       q = q.eq('enlonador_id', sessionId);
     }
 
-    q.order('fecha_registro', { ascending: false })
+    q
+      .order('fecha_registro', { ascending: false })
       .then(({ data }) => setDespachos(data || []))
       .catch(console.error);
   };
@@ -463,7 +463,6 @@ function DashboardCore({ user }) {
           .catch(() =>
             new Notification('Despacho asignado', {
               body: `${data.punto_despacho} → ${assignedName}`,
-              icon: '/favicon.ico',
             })
           );
       }
@@ -502,7 +501,6 @@ function DashboardCore({ user }) {
           .catch(() =>
             new Notification('Estado actualizado', {
               body: `${data.punto_despacho} → ${estadoTexto}`,
-              icon: '/favicon.ico',
             })
           );
       }
@@ -731,7 +729,9 @@ function DashboardCore({ user }) {
           <Modal onClose={closeAdd} title="Nuevo Despacho">
             <form onSubmit={saveAdd} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Punto de Despacho</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Punto de Despacho
+                </label>
                 <Select
                   options={puntoDespachoOptions}
                   value={selectedPunto}
@@ -782,7 +782,9 @@ function DashboardCore({ user }) {
           <Modal onClose={closeAssign} title="Asignar Enlonador">
             <form onSubmit={saveAssign} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Enlonador</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Enlonador
+                </label>
                 <select
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   value={selEnlon}
@@ -875,10 +877,10 @@ function DashboardCore({ user }) {
                     </div>
                     <div className="p-3 flex justify-between items-center">
                       <div className="flex items-center">
-                          <div className={`${detail.fecha_aceptacion ? 'bg-green-100' : 'bg-gray-100'} p-2 rounded-full mr-3`}>
-                            <FiCheck className={detail.fecha_aceptacion ? 'text-green-600' : 'text-gray-400'} size={16} />
-                          </div>
-                          <p>Aceptado</p>
+                        <div className={`${detail.fecha_aceptacion ? 'bg-green-100' : 'bg-gray-100'} p-2 rounded-full mr-3`}>
+                          <FiCheck className={detail.fecha_aceptacion ? 'text-green-600' : 'text-gray-400'} size={16} />
+                        </div>
+                        <p>Aceptado</p>
                       </div>
                       <p className="text-sm text-gray-600 font-medium">
                         {detail.fecha_aceptacion ? new Date(detail.fecha_aceptacion).toLocaleString() : '-'}
@@ -897,10 +899,10 @@ function DashboardCore({ user }) {
                     </div>
                     <div className="p-3 flex justify-between items-center">
                       <div className="flex items-center">
-                      <div className={`${detail.fecha_completado ? 'bg-green-100' : 'bg-gray-100'} p-2 rounded-full mr-3`}>
-                        <FiCheckCircle className={detail.fecha_completado ? 'text-green-600' : 'text-gray-400'} size={16} />
-                      </div>
-                      <p>Completado</p>
+                        <div className={`${detail.fecha_completado ? 'bg-green-100' : 'bg-gray-100'} p-2 rounded-full mr-3`}>
+                          <FiCheckCircle className={detail.fecha_completado ? 'text-green-600' : 'text-gray-400'} size={16} />
+                        </div>
+                        <p>Completado</p>
                       </div>
                       <p className="text-sm text-gray-600 font-medium">
                         {detail.fecha_completado ? new Date(detail.fecha_completado).toLocaleString() : '-'}
@@ -929,7 +931,7 @@ function DashboardCore({ user }) {
 function Modal({ onClose, title, children }) {
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 px-4 py-6">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-auto overflow-hidden animate-fadeIn">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-auto overflow-y-auto max-h-[calc(100vh-6rem)] animate-fadeIn">
         <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 bg-gray-50">
           <h2 className="text-lg font-medium text-gray-800">{title}</h2>
           <button
@@ -939,7 +941,9 @@ function Modal({ onClose, title, children }) {
             <FiX className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-6">{children}</div>
+        <div className="p-6">
+          {children}
+        </div>
       </div>
     </div>
   );
