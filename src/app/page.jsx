@@ -118,17 +118,11 @@ function DashboardCore({ user }) {
       console.warn("Geolocalización no soportada");
       return;
     }
-    // permiso inicial
     navigator.geolocation.getCurrentPosition(
-      () => {
-        console.info("Tracking de ubicación iniciado");
-      },
-      (err) => {
-        console.error("Error obteniendo ubicación:", err);
-      },
+      () => console.info("Tracking de ubicación iniciado"),
+      err => console.error("Error obteniendo ubicación:", err),
       { enableHighAccuracy: true }
     );
-    // intervalo 30s
     const interval = setInterval(() => {
       navigator.geolocation.getCurrentPosition(
         async ({ coords }) => {
@@ -136,24 +130,16 @@ function DashboardCore({ user }) {
             const res = await fetch('/api/location', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                latitude: coords.latitude,
-                longitude: coords.longitude,
-              }),
+              body: JSON.stringify({ latitude: coords.latitude, longitude: coords.longitude }),
             });
-            if (res.ok) {
-              console.info("Ubicación enviada");
-            } else {
-              const text = await res.text();
-              console.error("Error enviando ubicación:", text);
+            if (!res.ok) {
+              console.error("Error enviando ubicación:", await res.text());
             }
           } catch (error) {
             console.error("Error en fetch:", error);
           }
         },
-        (err) => {
-          console.error("Error obteniendo posición:", err);
-        },
+        err => console.error("Error obteniendo posición:", err),
         { enableHighAccuracy: true }
       );
     }, 30000);
@@ -183,11 +169,10 @@ function DashboardCore({ user }) {
     if (sm) setFilterMine(sm === 'true');
     if (sa) setFilterAssigned(sa === 'true');
   }, []);
-
   // Persistir filtros
-  useEffect(() => { localStorage.setItem('dateFilter', dateFilter); }, [dateFilter]);
-  useEffect(() => { localStorage.setItem('filterMine', filterMine.toString()); }, [filterMine]);
-  useEffect(() => { localStorage.setItem('filterAssigned', filterAssigned.toString()); }, [filterAssigned]);
+  useEffect(() => localStorage.setItem('dateFilter', dateFilter), [dateFilter]);
+  useEffect(() => localStorage.setItem('filterMine', filterMine.toString()), [filterMine]);
+  useEffect(() => localStorage.setItem('filterAssigned', filterAssigned.toString()), [filterAssigned]);
 
   const estadoStyles = {
     PENDIENTE: 'bg-yellow-100 text-yellow-800',
@@ -195,7 +180,7 @@ function DashboardCore({ user }) {
     EN_PROCESO: 'bg-orange-100 text-orange-800',
     COMPLETADO: 'bg-green-100 text-green-800',
   };
-  const formatEstado = (e) =>
+  const formatEstado = e =>
     e.toLowerCase().replace(/_/g, ' ').replace(/^[a-z]/, c => c.toUpperCase());
 
   const syncPermission = () => {
@@ -223,15 +208,14 @@ function DashboardCore({ user }) {
         text: 'Las notificaciones están deshabilitadas en configuración.',
       });
     }
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(console.error);
-    }
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(console.error);
   }, []);
 
   // Upsert sesión en Supabase
   useEffect(() => {
     if (!userId) return;
-    supabase.from('user_sessions_supabase')
+    supabase
+      .from('user_sessions_supabase')
       .upsert({
         external_user_id: userId,
         username,
@@ -240,14 +224,16 @@ function DashboardCore({ user }) {
         status: 'online',
         last_active: new Date().toISOString(),
       }, { onConflict: 'external_user_id' })
-      .select('id').single()
+      .select('id')
+      .single()
       .then(({ data }) => setSessionId(data.id))
       .catch(console.error);
   }, [userId, username, roleId, roleName]);
 
   // Carga lista de enlonadores
   useEffect(() => {
-    supabase.from('user_sessions_supabase')
+    supabase
+      .from('user_sessions_supabase')
       .select('id,username')
       .eq('role_id', 4)
       .then(({ data }) => setEnlonadores(data))
@@ -272,120 +258,150 @@ function DashboardCore({ user }) {
       supervisor:user_sessions_supabase!despachos_supervisor_despacho_id_fkey(username),
       enlonador:user_sessions_supabase!despachos_enlonador_id_fkey(username)
     `);
+
     if (dateFilter) {
       const start = new Date(`${dateFilter}T00:00:00`);
       const next = new Date(start);
-      next.setDate(start.getDate()+1);
+      next.setDate(start.getDate() + 1);
       q = q.gte('fecha_registro', start.toISOString()).lt('fecha_registro', next.toISOString());
     }
-    if (roleId===3 && filterMine) q = q.eq('operador_bascula_id', sessionId);
-    if (roleId===2 && filterAssigned) q = q.eq('supervisor_despacho_id', sessionId);
-    if (roleId===4) q = q.eq('enlonador_id', sessionId);
-    q.order('fecha_registro',{ascending:false})
-     .then(({ data }) => setDespachos(data||[]))
-     .catch(console.error);
+    if (roleId === 3 && filterMine) q = q.eq('operador_bascula_id', sessionId);
+    if (roleId === 2 && filterAssigned) q = q.eq('supervisor_despacho_id', sessionId);
+    if (roleId === 4) q = q.eq('enlonador_id', sessionId);
+
+    q.order('fecha_registro', { ascending: false })
+      .then(({ data }) => setDespachos(data || []))
+      .catch(console.error);
   };
-  useEffect(() => { if(sessionId) fetchDespachos(); }, [sessionId, roleId, filterMine, filterAssigned, dateFilter]);
+  useEffect(() => { if (sessionId) fetchDespachos(); }, [sessionId, roleId, filterMine, filterAssigned, dateFilter]);
 
   // Realtime
   useEffect(() => {
     if (!sessionId) return;
-    const channel = supabase.channel('despachos_realtime')
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'despachos'},({new:row})=>{
+    const channel = supabase
+      .channel('despachos_realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'despachos' }, ({ new: row }) => {
         fetchDespachos();
-        if (!suppressRealtime.current && Notification.permission==='granted') {
+        if (!suppressRealtime.current && Notification.permission === 'granted') {
           navigator.serviceWorker.ready
-            .then(reg=>reg.showNotification('Nuevo despacho',{body:row.punto_despacho,icon:'/favicon.ico'}))
-            .catch(()=>new Notification('Nuevo despacho',{body:row.punto_despacho}));
-          Swal.fire({icon:'info',title:'Nuevo despacho',text:row.punto_despacho,timer:2000,showConfirmButton:false});
+            .then(reg => reg.showNotification('Nuevo despacho', { body: row.punto_despacho, icon: '/favicon.ico' }))
+            .catch(() => new Notification('Nuevo despacho', { body: row.punto_despacho }));
+          Swal.fire({ icon: 'info', title: 'Nuevo despacho', text: row.punto_despacho, timer: 2000, showConfirmButton: false });
         }
       })
-      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'despachos'},async({old,new:row})=>{
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'despachos' }, async ({ old, new: row }) => {
         fetchDespachos();
-        if (!suppressRealtime.current && old.estado!==row.estado) {
-          const texto=formatEstado(row.estado);
+        if (!suppressRealtime.current && old.estado !== row.estado) {
+          const texto = formatEstado(row.estado);
           navigator.serviceWorker.ready
-            .then(reg=>reg.showNotification('Estado actualizado',{body:`${row.punto_despacho} → ${texto}`,icon:'/favicon.ico'}))
-            .catch(()=>new Notification('Estado actualizado',{body:`${row.punto_despacho} → ${texto}`}));
-          Swal.fire({icon:'info',title:'Estado actualizado',text:`${row.punto_despacho} → ${texto}`,timer:2000,showConfirmButton:false});
+            .then(reg => reg.showNotification('Estado actualizado', { body: `${row.punto_despacho} → ${texto}`, icon: '/favicon.ico' }))
+            .catch(() => new Notification('Estado actualizado', { body: `${row.punto_despacho} → ${texto}` }));
+          Swal.fire({ icon: 'info', title: 'Estado actualizado', text: `${row.punto_despacho} → ${texto}`, timer: 2000, showConfirmButton: false });
         }
-        if (!suppressRealtime.current && old.enlonador_id!==row.enlonador_id) {
-          const { data:enlonData,error:enlonError } = await supabase.from('user_sessions_supabase').select('username').eq('id',row.enlonador_id).single();
-          const name = enlonError?'desconocido':enlonData.username;
+        if (!suppressRealtime.current && old.enlonador_id !== row.enlonador_id) {
+          const { data: enlonData, error: enlonError } = await supabase
+            .from('user_sessions_supabase')
+            .select('username')
+            .eq('id', row.enlonador_id)
+            .single();
+          const name = enlonError ? 'desconocido' : enlonData.username;
           navigator.serviceWorker.ready
-            .then(reg=>reg.showNotification('Asignación modificada',{body:`${row.punto_despacho} → ${name}`,icon:'/favicon.ico'}))
-            .catch(()=>new Notification('Asignación modificada',{body:`${row.punto_despacho} → ${name}`}));
-          Swal.fire({icon:'info',title:'Asignación modificada',text:`${row.punto_despacho} → ${name}`,timer:2000,showConfirmButton:false});
+            .then(reg => reg.showNotification('Asignación modificada', { body: `${row.punto_despacho} → ${name}`, icon: '/favicon.ico' }))
+            .catch(() => new Notification('Asignación modificada', { body: `${row.punto_despacho} → ${name}` }));
+          Swal.fire({ icon: 'info', title: 'Asignación modificada', text: `${row.punto_despacho} → ${name}`, timer: 2000, showConfirmButton: false });
         }
       })
       .subscribe();
-    return ()=>supabase.removeChannel(channel);
-  },[sessionId,roleId,filterMine,filterAssigned,dateFilter]);
+    return () => supabase.removeChannel(channel);
+  }, [sessionId, roleId, filterMine, filterAssigned, dateFilter]);
 
   // Handlers CRUD...
-  const openAdd = ()=>{ setSelectedPunto(null); setPlaca(''); setShowAdd(true); };
-  const closeAdd = ()=>setShowAdd(false);
-  const saveAdd = async e=>{
+  const openAdd = () => { setSelectedPunto(null); setPlaca(''); setShowAdd(true); };
+  const closeAdd = () => setShowAdd(false);
+  const saveAdd = async e => {
     e.preventDefault();
-    if(!selectedPunto){ Swal.fire('Error','Selecciona un punto de despacho','error'); return; }
-    suppressRealtime.current=true;
-    const { data, error } = await supabase.from('despachos')
-      .insert([{ punto_despacho:selectedPunto.value,placa_cabezal:placa,operador_bascula_id:sessionId,fecha_registro:new Date().toISOString() }])
-      .select('punto_despacho').single();
-    if(error) Swal.fire('Error',error.message,'error');
-    else{
-      if(Notification.permission==='granted'){
-        navigator.serviceWorker.ready.then(reg=>reg.showNotification('Despacho creado',{body:data.punto_despacho,icon:'/favicon.ico'}))
-          .catch(()=>new Notification('Despacho creado',{body:data.punto_despacho}));
+    if (!selectedPunto) {
+      Swal.fire('Error', 'Selecciona un punto de despacho', 'error');
+      return;
+    }
+    suppressRealtime.current = true;
+    const { data, error } = await supabase
+      .from('despachos')
+      .insert([{
+        punto_despacho: selectedPunto.value,
+        placa_cabezal: placa,
+        operador_bascula_id: sessionId,
+        fecha_registro: new Date().toISOString(),
+      }])
+      .select('punto_despacho')
+      .single();
+    if (error) {
+      Swal.fire('Error', error.message, 'error');
+    } else {
+      if (Notification.permission === 'granted') {
+        navigator.serviceWorker.ready
+          .then(reg => reg.showNotification('Despacho creado', { body: data.punto_despacho, icon: '/favicon.ico' }))
+          .catch(() => new Notification('Despacho creado', { body: data.punto_despacho }));
       }
-      Swal.fire({icon:'success',title:'Despacho creado',text:data.punto_despacho,timer:2000,showConfirmButton:false});
+      Swal.fire({ icon: 'success', title: 'Despacho creado', text: data.punto_despacho, timer: 2000, showConfirmButton: false });
       setShowAdd(false);
     }
-    setTimeout(()=>suppressRealtime.current=false,1000);
+    setTimeout(() => suppressRealtime.current = false, 1000);
   };
 
-  const openAssign = id=>{ setAssignId(id); setSelEnlon(''); setShowAssign(true); };
-  const closeAssign = ()=>setShowAssign(false);
-  const saveAssign = async e=>{
+  const openAssign = id => { setAssignId(id); setSelEnlon(''); setShowAssign(true); };
+  const closeAssign = () => setShowAssign(false);
+  const saveAssign = async e => {
     e.preventDefault();
-    suppressRealtime.current=true;
-    const { data, error } = await supabase.from('despachos')
-      .update({ supervisor_despacho_id:sessionId, enlonador_id:selEnlon })
-      .eq('id',assignId)
+    suppressRealtime.current = true;
+    const { data, error } = await supabase
+      .from('despachos')
+      .update({
+        supervisor_despacho_id: sessionId,
+        enlonador_id: selEnlon,
+      })
+      .eq('id', assignId)
       .select('punto_despacho,enlonador:user_sessions_supabase!despachos_enlonador_id_fkey(username)')
       .single();
-    if(error) Swal.fire('Error',error.message,'error');
-    else{
-      const name=data.enlonador?.username||'';
-      if(Notification.permission==='granted'){
-        navigator.serviceWorker.ready.then(reg=>reg.showNotification('Despacho asignado',{body:`${data.punto_despacho} → ${name}`,icon:'/favicon.ico'}))
-          .catch(()=>new Notification('Despacho asignado',{body:`${data.punto_despacho} → ${name}`}));
+    if (error) {
+      Swal.fire('Error', error.message, 'error');
+    } else {
+      const name = data.enlonador?.username || '';
+      if (Notification.permission === 'granted') {
+        navigator.serviceWorker.ready
+          .then(reg => reg.showNotification('Despacho asignado', { body: `${data.punto_despacho} → ${name}`, icon: '/favicon.ico' }))
+          .catch(() => new Notification('Despacho asignado', { body: `${data.punto_despacho} → ${name}` }));
       }
-      Swal.fire({icon:'success',title:'Despacho asignado',text:`${data.punto_despacho} → ${name}`,timer:2000,showConfirmButton:false});
+      Swal.fire({ icon: 'success', title: 'Despacho asignado', text: `${data.punto_despacho} → ${name}`, timer: 2000, showConfirmButton: false });
       setShowAssign(false);
     }
-    setTimeout(()=>suppressRealtime.current=false,1000);
+    setTimeout(() => suppressRealtime.current = false, 1000);
   };
 
-  const changeState=async(id,st,fld)=>{
-    suppressRealtime.current=true;
-    const { data, error }=await supabase.from('despachos')
-      .update({ estado:st, [fld]:new Date().toISOString() })
-      .eq('id',id).select('punto_despacho').single();
-    if(error) Swal.fire('Error',error.message,'error');
-    else{
-      const texto=formatEstado(st);
-      if(Notification.permission==='granted'){
-        navigator.serviceWorker.ready.then(reg=>reg.showNotification('Estado actualizado',{body:`${data.punto_despacho} → ${texto}`,icon:'/favicon.ico'}))
-          .catch(()=>new Notification('Estado actualizado',{body:`${data.punto_despacho} → ${texto}`}));
+  const changeState = async (id, st, fld) => {
+    suppressRealtime.current = true;
+    const { data, error } = await supabase
+      .from('despachos')
+      .update({ estado: st, [fld]: new Date().toISOString() })
+      .eq('id', id)
+      .select('punto_despacho')
+      .single();
+    if (error) {
+      Swal.fire('Error', error.message, 'error');
+    } else {
+      const texto = formatEstado(st);
+      if (Notification.permission === 'granted') {
+        navigator.serviceWorker.ready
+          .then(reg => reg.showNotification('Estado actualizado', { body: `${data.punto_despacho} → ${texto}`, icon: '/favicon.ico' }))
+          .catch(() => new Notification('Estado actualizado', { body: `${data.punto_despacho} → ${texto}` }));
       }
-      Swal.fire({icon:'success',title:'Estado actualizado',text:`${data.punto_despacho} → ${texto}`,timer:2000,showConfirmButton:false});
+      Swal.fire({ icon: 'success', title: 'Estado actualizado', text: `${data.punto_despacho} → ${texto}`, timer: 2000, showConfirmButton: false });
     }
-    setTimeout(()=>suppressRealtime.current=false,1000);
+    setTimeout(() => suppressRealtime.current = false, 1000);
   };
 
-  const openDetail=row=>{ setDetail(row); setShowDetail(true); };
-  const closeDetail=()=>setShowDetail(false);
+  const openDetail = row => { setDetail(row); setShowDetail(true); };
+  const closeDetail = () => setShowDetail(false);
 
   return (
     <div className="min-h-screen bg-white">
@@ -398,9 +414,12 @@ function DashboardCore({ user }) {
               <FiTruck className="text-white bg-blue-600 p-2 rounded-lg mr-3" size={40} />
               Despachos
             </h1>
-            {(roleId===1||roleId===3)&&(
-              <button onClick={openAdd} className="flex items-center px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium shadow-sm">
-                <FiPlus className="mr-2" size={18}/>Agregar Despacho
+            {(roleId === 1 || roleId === 3) && (
+              <button
+                onClick={openAdd}
+                className="flex items-center px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium shadow-sm"
+              >
+                <FiPlus className="mr-2" size={18} />Agregar Despacho
               </button>
             )}
           </div>
@@ -414,23 +433,26 @@ function DashboardCore({ user }) {
                   <input
                     type="date"
                     value={dateFilter}
-                    onChange={e=>setDateFilter(e.target.value)}
+                    onChange={e => setDateFilter(e.target.value)}
                     className="pl-3 pr-8 py-2 border border-gray-300 rounded-lg shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
-                  {dateFilter&&(
-                    <button onClick={()=>setDateFilter('')} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                      <FiX size={16}/>
+                  {dateFilter && (
+                    <button
+                      onClick={() => setDateFilter('')}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <FiX size={16} />
                     </button>
                   )}
                 </div>
               </div>
               {/* Filtros por rol */}
-              {roleId===3&&(
+              {roleId === 3 && (
                 <div className="flex items-center space-x-2">
                   <label className="text-sm font-medium text-gray-700">Mostrar:</label>
                   <select
-                    value={filterMine?'mine':'all'}
-                    onChange={e=>setFilterMine(e.target.value==='mine')}
+                    value={filterMine ? 'mine' : 'all'}
+                    onChange={e => setFilterMine(e.target.value === 'mine')}
                     className="pl-3 pr-8 py-2 border border-gray-300 rounded-lg shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="all">Todos los despachos</option>
@@ -438,12 +460,12 @@ function DashboardCore({ user }) {
                   </select>
                 </div>
               )}
-              {roleId===2&&(
+              {roleId === 2 && (
                 <div className="flex items-center space-x-2">
                   <label className="text-sm font-medium text-gray-700">Mostrar:</label>
                   <select
-                    value={filterAssigned?'assigned':'all'}
-                    onChange={e=>setFilterAssigned(e.target.value==='assigned')}
+                    value={filterAssigned ? 'assigned' : 'all'}
+                    onChange={e => setFilterAssigned(e.target.value === 'assigned')}
                     className="pl-3 pr-8 py-2 border border-gray-300 rounded-lg shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="all">Todos los despachos</option>
@@ -457,20 +479,27 @@ function DashboardCore({ user }) {
           <div className="px-2 py-4">
             {/* Móvil */}
             <div className="space-y-4 md:hidden">
-              {despachos.length===0 ? (
+              {despachos.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
-                  <FiInbox className="mx-auto mb-3" size={32}/>
+                  <FiInbox className="mx-auto mb-3" size={32} />
                   <p>No hay despachos disponibles</p>
                 </div>
               ) : (
-                despachos.map(d=>(
-                  <div key={d.id} className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 space-y-3">
+                despachos.map(d => (
+                  <div
+                    key={d.id}
+                    className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 space-y-3"
+                  >
                     <div className="flex justify-between items-center">
                       <div className="flex items-center">
-                        <span className="bg-blue-100 text-blue-800 font-bold rounded-full h-8 w-8 flex items-center justify-center mr-2">#{d.id}</span>
+                        <span className="bg-blue-100 text-blue-800 font-bold rounded-full h-8 w-8 flex items-center justify-center mr-2">
+                          #{d.id}
+                        </span>
                         <h2 className="font-medium text-gray-900">{d.punto_despacho}</h2>
                       </div>
-                      <span className={`${estadoStyles[d.estado]} px-3 py-1 text-xs font-semibold rounded-full`}>
+                      <span
+                        className={`${estadoStyles[d.estado]} px-3 py-1 text-xs font-semibold rounded-full`}
+                      >
                         {formatEstado(d.estado)}
                       </span>
                     </div>
@@ -485,7 +514,14 @@ function DashboardCore({ user }) {
                       </div>
                     </div>
                     <div className="pt-2 border-t border-gray-100 flex flex-wrap gap-2">
-                      <ActionButtons despacho={d} roleId={roleId} openDetail={openDetail} openAssign={openAssign} changeState={changeState} sessionId={sessionId}/>
+                      <ActionButtons
+                        despacho={d}
+                        roleId={roleId}
+                        openDetail={openDetail}
+                        openAssign={openAssign}
+                        changeState={changeState}
+                        sessionId={sessionId}
+                      />
                     </div>
                   </div>
                 ))
@@ -493,33 +529,61 @@ function DashboardCore({ user }) {
             </div>
             {/* Escritorio */}
             <div className="hidden md:block overflow-x-auto rounded-lg">
-              {despachos.length===0 ? (
+              {despachos.length === 0 ? (
                 <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
-                  <FiInbox className="mx-auto mb-3 text-gray-400" size={48}/>
+                  <FiInbox className="mx-auto mb-3 text-gray-400" size={48} />
                   <p className="text-gray-500 text-lg">No hay despachos disponibles</p>
                 </div>
               ) : (
                 <table className="min-w-full divide-y divide-gray-200">
-                  <thead><tr className="bg-gray-50">
-                    {['ID','Punto de Despacho','Placa','Estado','Fecha Registro','Acciones'].map(h=>(
-                      <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
-                    ))}
-                  </tr></thead>
+                  <thead>
+                    <tr className="bg-gray-50">
+                      {['ID', 'Punto de Despacho', 'Placa', 'Estado', 'Fecha Registro', 'Acciones'].map(
+                        h => (
+                          <th
+                            key={h}
+                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          >
+                            {h}
+                          </th>
+                        )
+                      )}
+                    </tr>
+                  </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {despachos.map((d,i)=>(
-                      <tr key={d.id} className={i%2===0?'bg-white':'bg-gray-50'}>
+                    {despachos.map((d, i) => (
+                      <tr key={d.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          <span className="bg-blue-100 text-blue-800 font-bold rounded-full h-7 w-7 inline-flex items-center justify-center">{d.id}</span>
+                          <span className="bg-blue-100 text-blue-800 font-bold rounded-full h-7 w-7 inline-flex items-center justify-center">
+                            {d.id}
+                          </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{d.punto_despacho}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{d.placa_cabezal}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {d.punto_despacho}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {d.placa_cabezal}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`${estadoStyles[d.estado]} px-3 py-1 text-xs font-semibold rounded-full`}>{formatEstado(d.estado)}</span>
+                          <span
+                            className={`${estadoStyles[d.estado]} px-3 py-1 text-xs font-semibold rounded-full`}
+                          >
+                            {formatEstado(d.estado)}
+                          </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(d.fecha_registro).toLocaleString()}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(d.fecha_registro).toLocaleString()}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex flex-wrap gap-2">
-                            <ActionButtons despacho={d} roleId={roleId} openDetail={openDetail} openAssign={openAssign} changeState={changeState} sessionId={sessionId}/>
+                            <ActionButtons
+                              despacho={d}
+                              roleId={roleId}
+                              openDetail={openDetail}
+                              openAssign={openAssign}
+                              changeState={changeState}
+                              sessionId={sessionId}
+                            />
                           </div>
                         </td>
                       </tr>
@@ -536,16 +600,48 @@ function DashboardCore({ user }) {
           <Modal onClose={closeAdd} title="Nuevo Despacho">
             <form onSubmit={saveAdd} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Punto de Despacho</label>
-                <Select options={puntoDespachoOptions} value={selectedPunto} onChange={setSelectedPunto} placeholder="Selecciona un punto de despacho" className="text-sm" required/>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Punto de Despacho
+                </label>
+                <Select
+                  options={puntoDespachoOptions}
+                  value={selectedPunto}
+                  onChange={setSelectedPunto}
+                  placeholder="Selecciona un punto de despacho"
+                  className="text-sm"
+                  required
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Placa de Cabezal</label>
-                <input type="text" placeholder="Ingrese la placa" className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value={placa} maxLength={10} onChange={e=>setPlaca(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,''))} required/>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Placa de Cabezal
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ingrese la placa"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={placa}
+                  maxLength={10}
+                  onChange={e =>
+                    setPlaca(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))
+                  }
+                  required
+                />
               </div>
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={closeAdd} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition text-sm font-medium">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition shadow-sm text-sm font-medium">Guardar</button>
+                <button
+                  type="button"
+                  onClick={closeAdd}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition text-sm font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition shadow-sm text-sm font-medium"
+                >
+                  Guardar
+                </button>
               </div>
             </form>
           </Modal>
@@ -555,15 +651,37 @@ function DashboardCore({ user }) {
           <Modal onClose={closeAssign} title="Asignar Enlonador">
             <form onSubmit={saveAssign} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Enlonador</label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value={selEnlon} onChange={e=>setSelEnlon(+e.target.value)} required>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Enlonador
+                </label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={selEnlon}
+                  onChange={e => setSelEnlon(+e.target.value)}
+                  required
+                >
                   <option value="">Selecciona un enlonador</option>
-                  {enlonadores.map(u=><option key={u.id} value={u.id}>{u.username}</option>)}
+                  {enlonadores.map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.username}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={closeAssign} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition text-sm font-medium">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm text-sm font-medium">Asignar</button>
+                <button
+                  type="button"
+                  onClick={closeAssign}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition text-sm font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm text-sm font-medium"
+                >
+                  Asignar
+                </button>
               </div>
             </form>
           </Modal>
@@ -583,7 +701,11 @@ function DashboardCore({ user }) {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Estado</p>
-                  <span className={`${estadoStyles[detail.estado]} px-2 py-1 text-xs font-semibold rounded-full inline-block mt-1`}>{formatEstado(detail.estado)}</span>
+                  <span
+                    className={`${estadoStyles[detail.estado]} px-2 py-1 text-xs font-semibold rounded-full inline-block mt-1`}
+                  >
+                    {formatEstado(detail.estado)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -591,9 +713,18 @@ function DashboardCore({ user }) {
               <div>
                 <h3 className="text-sm font-medium text-gray-700 mb-2">Personal Asignado</h3>
                 <div className="bg-white border border-gray-200 rounded-lg p-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div><p className="text-xs text-gray-500">Operador</p><p className="font-medium">{detail.operador?.username||'-'}</p></div>
-                  <div><p className="text-xs text-gray-500">Supervisor</p><p className="font-medium">{detail.supervisor?.username||'-'}</p></div>
-                  <div><p className="text-xs text-gray-500">Enlonador</p><p className="font-medium">{detail.enlonador?.username||'-'}</p></div>
+                  <div>
+                    <p className="text-xs text-gray-500">Operador</p>
+                    <p className="font-medium">{detail.operador?.username || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Supervisor</p>
+                    <p className="font-medium">{detail.supervisor?.username || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Enlonador</p>
+                    <p className="font-medium">{detail.enlonador?.username || '-'}</p>
+                  </div>
                 </div>
               </div>
               <div>
@@ -601,27 +732,87 @@ function DashboardCore({ user }) {
                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                   <div className="grid grid-cols-1 divide-y divide-gray-200">
                     <div className="p-3 flex justify-between items-center">
-                      <div className="flex items-center"><div className="bg-blue-100 p-2 rounded-full mr-3"><FiClock className="text-blue-600" size={16}/></div><p>Registro</p></div>
-                      <p className="text-sm text-gray-600 font-medium">{new Date(detail.fecha_registro).toLocaleString()}</p>
+                      <div className="flex items-center">
+                        <div className="bg-blue-100 p-2 rounded-full mr-3">
+                          <FiClock className="text-blue-600" size={16} />
+                        </div>
+                        <p>Registro</p>
+                      </div>
+                      <p className="text-sm text-gray-600 font-medium">
+                        {new Date(detail.fecha_registro).toLocaleString()}
+                      </p>
                     </div>
                     <div className="p-3 flex justify-between items-center">
-                      <div className="flex items-center"><div className={`${detail.fecha_aceptacion?'bg-green-100':'bg-gray-100'} p-2 rounded-full mr-3`}><FiCheck className={detail.fecha_aceptacion?'text-green-600':'text-gray-400'} size={16}/></div><p>Aceptado</p></div>
-                      <p className="text-sm text-gray-600 font-medium">{detail.fecha_aceptacion?new Date(detail.fecha_aceptacion).toLocaleString():'-'}</p>
+                      <div className="flex items-center">
+                        <div
+                          className={`${
+                            detail.fecha_aceptacion ? 'bg-green-100' : 'bg-gray-100'
+                          } p-2 rounded-full mr-3`}
+                        >
+                          <FiCheck
+                            className={detail.fecha_aceptacion ? 'text-green-600' : 'text-gray-400'}
+                            size={16}
+                          />
+                        </div>
+                        <p>Aceptado</p>
+                      </div>
+                      <p className="text-sm text-gray-600 font-medium">
+                        {detail.fecha_aceptacion
+                          ? new Date(detail.fecha_aceptacion).toLocaleString()
+                          : '-'}
+                      </p>
                     </div>
                     <div className="p-3 flex justify-between items-center">
-                      <div className="flex items-center"><div className={`${detail.fecha_en_proceso?'bg-yellow-100':'bg-gray-100'} p-2 rounded-full mr-3`}><FiPlay className={detail.fecha_en_proceso?'text-yellow-600':'text-gray-400'} size={16}/></div><p>En Proceso</p></div>
-                      <p className="text-sm text-gray-600 font-medium">{detail.fecha_en_proceso?new Date(detail.fecha_en_proceso).toLocaleString():'-'}</p>
+                      <div className="flex items-center">
+                        <div
+                          className={`${
+                            detail.fecha_en_proceso ? 'bg-yellow-100' : 'bg-gray-100'
+                          } p-2 rounded-full mr-3`}
+                        >
+                          <FiPlay
+                            className={detail.fecha_en_proceso ? 'text-yellow-600' : 'text-gray-400'}
+                            size={16}
+                          />
+                        </div>
+                        <p>En Proceso</p>
+                      </div>
+                      <p className="text-sm text-gray-600 font-medium">
+                        {detail.fecha_en_proceso
+                          ? new Date(detail.fecha_en_proceso).toLocaleString()
+                          : '-'}
+                      </p>
                     </div>
                     <div className="p-3 flex justify-between items-center">
-                      <div className="flex items-center"><div className={`${detail.fecha_completado?'bg-green-100':'bg-gray-100'} p-2 rounded-full mr-3`}><FiCheckCircle className={detail.fecha_completado?'text-green-600':'text-gray-400'} size={16}/></div><p>Completado</p></div>
-                      <p className="text-sm text-gray-600 font-medium">{detail.fecha_completado?new Date(detail.fecha_completado).toLocaleString():'-'}</p>
+                      <div className="flex items-center">
+                        <div
+                          className={`${
+                            detail.fecha_completado ? 'bg-green-100' : 'bg-gray-100'
+                          } p-2 rounded-full mr-3`}
+                        >
+                          <FiCheckCircle
+                            className={detail.fecha_completado ? 'text-green-600' : 'text-gray-400'}
+                            size={16}
+                          />
+                        </div>
+                        <p>Completado</p>
+                      </div>
+                      <p className="text-sm text-gray-600 font-medium">
+                        {detail.fecha_completado
+                          ? new Date(detail.fecha_completado).toLocaleString()
+                          : '-'}
+                      </p>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
             <div className="mt-6 text-right">
-              <button onClick={closeDetail} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm text-sm font-medium">Cerrar</button>
+              <button
+                onClick={closeDetail}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm text-sm font-medium"
+              >
+                Cerrar
+              </button>
             </div>
           </Modal>
         )}
@@ -636,7 +827,10 @@ function Modal({ onClose, title, children }) {
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-auto overflow-y-auto max-h-[calc(100vh-6rem)] animate-fadeIn">
         <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 bg-gray-50">
           <h2 className="text-lg font-medium text-gray-800">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100"
+          >
             <FiX className="w-5 h-5" />
           </button>
         </div>
@@ -647,29 +841,79 @@ function Modal({ onClose, title, children }) {
 }
 
 function ActionButtons({ despacho, roleId, openDetail, openAssign, changeState, sessionId }) {
+  const [busy, setBusy] = useState(false);
   const isAssigned = despacho.enlonador_id === sessionId;
-  const btn = { base:"px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 font-medium transition-colors shadow-sm",
-                view:"bg-gray-100 text-gray-700 hover:bg-gray-200",
-                assign:"bg-blue-100 text-blue-700 hover:bg-blue-200",
-                accept:"bg-blue-600 text-white hover:bg-blue-700",
-                process:"bg-yellow-600 text-white hover:bg-yellow-700",
-                complete:"bg-green-600 text-white hover:bg-green-700"
-              };
+
+  const handleAssign = () => {
+    if (busy) return;
+        setBusy(true);
+        openAssign(despacho.id);
+        setBusy(false);
+  };
+
+  const handleStateChange = async (st, fld) => {
+    if (busy) return;
+    setBusy(true);
+    await changeState(despacho.id, st, fld);
+    setBusy(false);
+  };
+
+  const btn = {
+    base: "px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed",
+    view: "bg-gray-100 text-gray-700 hover:bg-gray-200",
+    assign: "bg-blue-100 text-blue-700 hover:bg-blue-200",
+    accept: "bg-blue-600 text-white hover:bg-blue-700",
+    process: "bg-yellow-600 text-white hover:bg-yellow-700",
+    complete: "bg-green-600 text-white hover:bg-green-700",
+  };
 
   return (
     <>
-      <button onClick={()=>openDetail(despacho)} className={`${btn.base} ${btn.view}`}><FiEye size={16}/> Ver</button>
-      {(roleId===1||roleId===2)&&despacho.estado==='PENDIENTE'&&(
-        <button onClick={()=>openAssign(despacho.id)} className={`${btn.base} ${btn.assign}`}><FiPlus size={16}/> Asignar</button>
+      <button
+        onClick={() => openDetail(despacho)}
+        className={`${btn.base} ${btn.view}`}
+      >
+        <FiEye size={16} /> Ver
+      </button>
+
+      {(roleId === 1 || roleId === 2) && despacho.estado === 'PENDIENTE' && (
+        <button
+          onClick={handleAssign}
+          disabled={busy}
+          className={`${btn.base} ${btn.assign}`}
+        >
+          <FiPlus size={16} /> Asignar
+        </button>
       )}
-      {((roleId===1)||(roleId===4&&isAssigned))&&despacho.estado==='PENDIENTE'&&(
-        <button onClick={()=>changeState(despacho.id,'ACEPTADO','fecha_aceptacion')} className={`${btn.base} ${btn.accept}`}><FiCheck size={16}/> Aceptar</button>
+
+      {((roleId === 1) || (roleId === 4 && isAssigned)) && despacho.estado === 'PENDIENTE' && (
+        <button
+          onClick={() => handleStateChange('ACEPTADO', 'fecha_aceptacion')}
+          disabled={busy}
+          className={`${btn.base} ${btn.accept}`}
+        >
+          <FiCheck size={16} /> Aceptar
+        </button>
       )}
-      {((roleId===1)||(roleId===4&&isAssigned))&&despacho.estado==='ACEPTADO'&&(
-        <button onClick={()=>changeState(despacho.id,'EN_PROCESO','fecha_en_proceso')} className={`${btn.base} ${btn.process}`}><FiPlay size={16}/> Iniciar</button>
+
+      {((roleId === 1) || (roleId === 4 && isAssigned)) && despacho.estado === 'ACEPTADO' && (
+        <button
+          onClick={() => handleStateChange('EN_PROCESO', 'fecha_en_proceso')}
+          disabled={busy}
+          className={`${btn.base} ${btn.process}`}
+        >
+          <FiPlay size={16} /> Iniciar
+        </button>
       )}
-      {((roleId===1)||(roleId===4&&isAssigned))&&despacho.estado==='EN_PROCESO'&&(
-        <button onClick={()=>changeState(despacho.id,'COMPLETADO','fecha_completado')} className={`${btn.base} ${btn.complete}`}><FiCheckCircle size={16}/> Completar</button>
+
+      {((roleId === 1) || (roleId === 4 && isAssigned)) && despacho.estado === 'EN_PROCESO' && (
+        <button
+          onClick={() => handleStateChange('COMPLETADO', 'fecha_completado')}
+          disabled={busy}
+          className={`${btn.base} ${btn.complete}`}
+        >
+          <FiCheckCircle size={16} /> Completar
+        </button>
       )}
     </>
   );
