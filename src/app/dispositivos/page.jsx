@@ -56,7 +56,7 @@ export default function DevicesPage() {
 
   return (
     <div className="h-screen w-full flex flex-col">
-      <Header title="Monitoreo de Dispositivos" />
+      <Header title="Dispositivos" />
       <div className="pt-20"></div>
       <div className="flex-1 p-4">
         <div className="bg-white rounded-lg shadow-md p-4 h-full relative">
