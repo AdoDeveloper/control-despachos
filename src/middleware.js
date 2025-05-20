@@ -22,11 +22,10 @@ const PUBLIC_ROUTES = [
 const PERMISSIONS = {
   AUTHENTICATED: [], // cualquier usuario autenticado
   ADMIN_ONLY: [ROLES.ADMINISTRADOR],
-  OP_ASSISTANT: [ROLES.ADMINISTRADOR, ROLES.SUPERVISOR_DESPACHOS],
-  MUELLERO: [ROLES.ADMINISTRADOR, ROLES.OPERADOR_BASCULA],
-  EQUIPOS: [ROLES.ADMINISTRADOR, ROLES.OPERADOR_BASCULA],
-  RECEPCION_FULL: [ROLES.ADMINISTRADOR],
-  RECEPCION_LIMITED: [ROLES.ADMINISTRADOR],
+  SUPERVISOR_ONLY: [ROLES.SUPERVISOR_DESPACHOS],
+  SUPERVISOR_ADMIN: [ROLES.SUPERVISOR_DESPACHOS, ROLES.ADMINISTRADOR],
+  ENLONADOR_ONLY: [ROLES.ENLONADOR],
+  ENLONADOR_ADMIN: [ROLES.ENLONADOR, ROLES.ADMINISTRADOR],
   ACONTECIMIENTOS: [ROLES.ADMINISTRADOR, ROLES.SUPERVISOR_DESPACHOS],
 };
 
@@ -37,6 +36,11 @@ const ROUTE_PERMISSIONS = {
   "/perfil": PERMISSIONS.AUTHENTICATED,
   "/proceso/iniciar": PERMISSIONS.AUTHENTICATED,
   "/building": PERMISSIONS.AUTHENTICATED,
+
+  // MONITOREO
+  "/api/location": PERMISSIONS.ENLONADOR_ADMIN,
+  "/dispositivos": PERMISSIONS.SUPERVISOR_ADMIN,
+  "/api/device-locations": PERMISSIONS.SUPERVISOR_ADMIN,
 
   // ADMIN
   "/usuarios": PERMISSIONS.ADMIN_ONLY,
@@ -52,7 +56,8 @@ const SecurityHeaders = {
   "X-Frame-Options": "DENY",
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  // Permitimos geolocalización desde nuestro propio origen
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(self)",
 };
 function applySecurityHeaders(res) {
   Object.entries(SecurityHeaders).forEach(([key, value]) => {
@@ -140,23 +145,13 @@ export const config = {
     "/api/health",
     "/perfil",
     "/building",
-    "/api/analysis",
-    "/proceso/analisis",
 
-    // SOPORTE
-    "/api/tickets",
-    "/api/tickets/:path*",
-    "/api/chat/:path*",
-    "/api/chat/delivered",
-    "/api/chat/estatus",
-    "/api/chat/messages/:path*",
-    "/api/chat/read",
-    "/api/chat/send",
-    "/soporte",
-    "/soporte/chat",
-    "/soporte/chat/:path*",
+    // MONITOREO
+    "/api/location",
 
     // ADMIN
+    "/dispositivos",
+    "/api/device-locations",
     "/usuarios",
     "/api/users/:path*",
     "/api/roles/:path*",

@@ -268,7 +268,7 @@ return (
 // Funciones auxiliares para mostrar información según el rol
 function getRoleDescription(role) {
   const descriptions = {
-    'Administrador': 'Acceso total al sistema y gestión de usuarios',
+    'Administrador': 'Acceso total al sistema',
     'Supervisor de Despacho': 'Supervisa operaciones y asigna despachos',
     'Operador de Bascula': 'Registra y monitorea despachos en el sistema',
     'Enlonador': 'Procesa y completa los despachos asignados',
@@ -281,9 +281,10 @@ function getRoleDescription(role) {
 function getPermissions(role) {
   const permissionsMap = {
     'Administrador': [
-      'Gestión completa de usuarios',
-      'Gestión de roles y permisos',
-      'Gestionar despachos',
+      'Gestión de usuarios',
+      'Gestión de roles',
+      'Gestión de despachos',
+      'Gestión de dispositivos',
       'Acceso a todas las funciones'
     ],
     'Supervisor de Despacho': [

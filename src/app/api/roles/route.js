@@ -3,7 +3,11 @@ import prisma from "../../../../lib/prisma";
 
 export async function GET(request) {
   try {
-    const roles = await prisma.role.findMany();
+    const roles = await prisma.role.findMany(
+      {
+        orderBy: { id: "asc" },
+      }
+    );
     return NextResponse.json(roles, { status: 200 });
   } catch (error) {
     console.error("Error fetching roles:", error);

@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {  images: {
+const nextConfig = {
+  images: {
     remotePatterns: [
       {
         protocol: 'https',
@@ -7,6 +8,21 @@ const nextConfig = {  images: {
         pathname: '/**',
       },
     ],
+  },
+  async headers() {
+    return [
+      {
+        // Aplica a todas las rutas de la app
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Permissions-Policy',
+            // Permitir geolocalización solo desde este mismo origen
+            value: 'geolocation=(self)',
+          },
+        ],
+      },
+    ];
   },
 };
 

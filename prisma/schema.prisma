@@ -24,10 +24,11 @@ model User {
 
   // Relaciones con Despacho
   tareasOperador    Despacho[]   @relation("operadorTasks")
-  tareasSupervisión Despacho[]   @relation("supervisorTasks")
+  tareasSupervision Despacho[]   @relation("supervisorTasks")
   tareasEnlonador   Despacho[]   @relation("enlonadorTasks")
 
   sessions          Session[]
+  deviceLocations   DeviceLocation[]
 
   @@map("users")
 }
@@ -100,4 +101,16 @@ enum EstadoTarea {
   ACEPTADO    // el Enlonador vio la tarea y la aceptó
   EN_PROCESO  // el Enlonador la está ejecutando
   COMPLETADO    // ya finalizada
+}
+
+model DeviceLocation {
+  id         Int      @id @default(autoincrement())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     Int      @map("user_id")
+  latitude   Float
+  longitude  Float
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("device_locations")
+  @@index([userId])
 }

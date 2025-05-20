@@ -19,6 +19,9 @@ export async function GET(request) {
     const users = await prisma.user.findMany({
       where: { eliminado: false },
       include: { role: true },
+      orderBy: {
+        id: "asc", 
+      }
     });
     // Remover el campo password de cada usuario
     const sanitizedUsers = users.map(({ password, ...rest }) => rest);
