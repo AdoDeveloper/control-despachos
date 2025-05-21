@@ -6,6 +6,7 @@ import { signIn, useSession, getSession } from "next-auth/react";
 import Image from "next/image";
 import Swal from "sweetalert2";
 import { FiLoader } from "react-icons/fi";
+import Loader from "./Loader";
 
 export default function LoginForm() {
   const { data: session, status } = useSession();
@@ -131,9 +132,7 @@ export default function LoginForm() {
 
   if (status === "loading") {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <FiLoader className="animate-spin text-3xl text-cyan-600" />
-      </div>
+      <Loader />
     );
   }
 

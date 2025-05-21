@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { useState, useEffect } from 'react';
 import Header from '../../components/Header';
 import { TbRefresh, TbEye, TbEyeOff } from 'react-icons/tb';
+import Loader from '../../components/Loader';
 
 // Cargamos el cliente de mapa sin SSR
 const DevicesMap = dynamic(() => import('../../components/DevicesMap'), { 
@@ -34,12 +35,9 @@ export default function DevicesPage() {
   const toggleMarkers = () => setShowMarkers(prev => !prev);
   
   if (isLoading) return (
-    <div className="h-screen w-full flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">Cargando sistema de monitoreo...</p>
+      <div className="flex items-center justify-center h-screen">
+        <Loader />
       </div>
-    </div>
   );
 
   if (!session || (session.user.roleId !== 1 && session.user.roleId !== 2)) {

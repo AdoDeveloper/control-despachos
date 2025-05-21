@@ -18,6 +18,7 @@ import {
   FiClock,
 } from 'react-icons/fi';
 import Header from '../components/Header';
+import Loader from '../components/Loader';
 
 // Cargar react-select dinámicamente para evitar problemas SSR
 const Select = dynamic(() => import('react-select'), { ssr: false });
@@ -89,11 +90,12 @@ export default function DashboardPage() {
 
   if (status === 'loading') {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
-        <p className="text-lg">Cargando...</p>
+      <div className="flex items-center justify-center h-screen">
+        <Loader />
       </div>
     );
   }
+
   if (!session?.user) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50">
@@ -113,37 +115,51 @@ function DashboardCore({ user }) {
 
   // TRACKING DE UBICACIÓN PARA ENLONADORES
   useEffect(() => {
-    if (roleId !== 4) return; // sólo enlonadores
-    if (!('geolocation' in navigator)) {
-      console.warn("Geolocalización no soportada");
-      return;
+  if (roleId !== 4) return;           // sólo enlonadores
+  if (!('geolocation' in navigator)) {
+    console.warn('Geolocalización no soportada');
+    return;
+  }
+
+  // Función reutilizable para enviar coordenadas al servidor
+  const sendLocation = async (coords) => {
+    try {
+      const res = await fetch('/api/location', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          latitude:  coords.latitude,
+          longitude: coords.longitude,
+        }),
+      });
+      if (!res.ok) {
+        console.error('Error enviando ubicación:', await res.text());
+      }
+    } catch (error) {
+      console.error('Error en fetch:', error);
     }
+  };
+
+  // Envío inicial al cargar la página
+  navigator.geolocation.getCurrentPosition(
+    ({ coords }) => {
+      console.info('Ubicación inicial enviada');
+      sendLocation(coords);
+    },
+    (err) => console.error('Error obteniendo ubicación inicial:', err),
+    { enableHighAccuracy: true }
+  );
+
+  // Envíos periódicos cada 30 s
+  const intervalId = setInterval(() => {
     navigator.geolocation.getCurrentPosition(
-      () => console.info("Tracking de ubicación iniciado"),
-      err => console.error("Error obteniendo ubicación:", err),
+      ({ coords }) => sendLocation(coords),
+      (err) => console.error('Error obteniendo ubicación periódica:', err),
       { enableHighAccuracy: true }
     );
-    const interval = setInterval(() => {
-      navigator.geolocation.getCurrentPosition(
-        async ({ coords }) => {
-          try {
-            const res = await fetch('/api/location', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ latitude: coords.latitude, longitude: coords.longitude }),
-            });
-            if (!res.ok) {
-              console.error("Error enviando ubicación:", await res.text());
-            }
-          } catch (error) {
-            console.error("Error en fetch:", error);
-          }
-        },
-        err => console.error("Error obteniendo posición:", err),
-        { enableHighAccuracy: true }
-      );
-    }, 30000);
-    return () => clearInterval(interval);
+  }, 30_000);
+
+  return () => clearInterval(intervalId);
   }, [roleId]);
 
   // Estados y filtros
@@ -196,7 +212,7 @@ function DashboardCore({ user }) {
       Swal.fire({
         icon: 'warning',
         title: 'Permisos de notificación',
-        text: 'Por favor habilita las notificaciones para recibir alertas de nuevos despachos.',
+        text: 'Por favor habilita las notificaciones y la ubicación GPS para recibir alertas de nuevos despachos.',
         confirmButtonText: 'Habilitar',
       }).then(result => {
         if (result.isConfirmed) Notification.requestPermission().then(syncPermission);

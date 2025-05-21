@@ -1,11 +1,11 @@
-generator client {
-  provider = "prisma-client-js"
-  output   = "../node_modules/.prisma/client"
-}
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 model User {
@@ -57,6 +57,7 @@ model Session {
 /// ---------------------------------------------------------------------
 model Despacho {
   id                    Int          @id @default(autoincrement()) @map("id")
+  registerId            String       @unique @map("register_id")
   puntoDespacho         String       @map("punto_despacho")
   placaCabezal          String       @map("placa_cabezal")
 
